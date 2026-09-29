@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   build:
-    name: Build and attach unsigned APK
+    name: Build and attach signed APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -29,10 +29,39 @@ jobs:
           cache: gradle
 
       - name: Install Android SDK platform
-        run: sdkmanager 'platforms;android-37'
+        run: sdkmanager 'platforms;android-37' 'build-tools;37.0.0'
 
       - name: Build unsigned release APK
         run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Sign and verify release APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          : "${ANDROID_KEYSTORE_BASE64:?Missing signing keystore secret}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?Missing signing password secret}"
+          : "${ANDROID_KEY_ALIAS:?Missing signing alias secret}"
+          umask 077
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/apk-signing.XXXXXX")
+          trap 'rm -f "$signing_dir/release.p12"; rmdir "$signing_dir"' EXIT
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$signing_dir/release.p12"
+          build_tools="$ANDROID_HOME/build-tools/37.0.0"
+          "$build_tools/zipalign" -P 16 -f 4 \
+            app/build/outputs/apk/release/app-release-unsigned.apk \
+            "$RUNNER_TEMP/OpenPrinterProxy-aligned.apk"
+          "$build_tools/apksigner" sign \
+            --ks "$signing_dir/release.p12" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+            --key-pass env:ANDROID_KEYSTORE_PASSWORD \
+            --v4-signing-enabled false \
+            --out OpenPrinterProxy.apk \
+            "$RUNNER_TEMP/OpenPrinterProxy-aligned.apk"
+          "$build_tools/apksigner" verify --verbose OpenPrinterProxy.apk
+          "$build_tools/zipalign" -c -P 16 4 OpenPrinterProxy.apk
 
       - name: Attach APK to release
         env:
@@ -40,5 +69,4 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          cp app/build/outputs/apk/release/app-release-unsigned.apk OpenPrinterProxy-unsigned.apk
-          gh release upload "$RELEASE_TAG" OpenPrinterProxy-unsigned.apk --clobber
+          gh release upload "$RELEASE_TAG" OpenPrinterProxy.apk --clobber

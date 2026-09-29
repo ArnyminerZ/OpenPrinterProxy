@@ -75,9 +75,13 @@ If multiple devices are connected, add `-s DEVICE_SERIAL` to the ADB install com
 
 ### Release APKs
 
-Publishing a GitHub release (including a prerelease) runs the release workflow, which builds the tagged source and attaches `OpenPrinterProxy-unsigned.apk` to that release. Draft releases do not trigger a build. No signing secrets are needed.
+Publishing a GitHub release (including a prerelease) runs the release workflow, which builds the tagged source, signs and verifies the APK, and attaches `OpenPrinterProxy.apk` to that release. Draft releases do not trigger a build.
 
-The release APK is unsigned and must be signed before it can be installed on Android. For a directly installable development build, use the debug build instructions above.
+Signing uses the repository secrets `ANDROID_KEYSTORE_BASE64` (base64-encoded PKCS12 keystore), `ANDROID_KEYSTORE_PASSWORD` (both the store and key password), and `ANDROID_KEY_ALIAS`. The workflow restores the key only for the signing step and removes the temporary keystore afterwards. Missing signing secrets fail the workflow; it will not publish an unsigned APK.
+
+Local signing material is kept in the ignored `.signing/` directory and must never be committed. Back up the keystore and its password securely: future app updates must use the same signing key. Forks need to configure their own signing secrets. Local Gradle release builds remain unsigned; debug builds use Android's debug key.
+
+The signed release APK can be installed on Android, but cannot update an existing debug-signed installation because its signing key differs. Back up any needed settings before uninstalling a debug build to switch to a release build.
 
 ### Checks
 
