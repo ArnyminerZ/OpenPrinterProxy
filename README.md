@@ -73,6 +73,12 @@ adb install -r -t app/build/outputs/apk/debug/app-debug.apk
 
 If multiple devices are connected, add `-s DEVICE_SERIAL` to the ADB install command. On Windows, use `gradlew.bat` in place of `./gradlew`.
 
+### Release APKs
+
+Publishing a GitHub release (including a prerelease) runs the release workflow, which builds the tagged source and attaches `OpenPrinterProxy-unsigned.apk` to that release. Draft releases do not trigger a build. No signing secrets are needed.
+
+The release APK is unsigned and must be signed before it can be installed on Android. For a directly installable development build, use the debug build instructions above.
+
 ### Checks
 
 ```sh
