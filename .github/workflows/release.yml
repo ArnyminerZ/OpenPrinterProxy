@@ -28,8 +28,10 @@ jobs:
           java-version: '25'
           cache: gradle
 
-      - name: Install Android SDK platform
-        run: sdkmanager 'platforms;android-37' 'build-tools;37.0.0'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-37 build-tools;37.0.0'
 
       - name: Build unsigned release APK
         run: ./gradlew --no-daemon :app:assembleRelease
