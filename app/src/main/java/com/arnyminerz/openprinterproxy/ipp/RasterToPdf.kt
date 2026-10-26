@@ -87,9 +87,10 @@ object RasterToPdf {
                     }
                     FORMAT_URF -> {
                         data.skipBytes(8) // "UNIRAST\0"
-                        val pageCount = data.readInt()
-                        repeat(pageCount) {
-                            val header = readUrfHeader(data) ?: return@repeat
+                        // Clients that stream the pages don't know the total and write 0, so read until the end then
+                        val declaredPages = data.readInt()
+                        while (declaredPages == 0 || pageNumber < declaredPages) {
+                            val header = readUrfHeader(data) ?: break
                             drawPage(document, data, header, ++pageNumber, isCancelled)
                         }
                     }
